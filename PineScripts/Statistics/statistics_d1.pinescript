@@ -1,0 +1,96 @@
+//Этот скрипт на Pine Script версии 5 представляет собой индикатор 
+//для анализа статистики свечей на основе дней недели.
+//просто скопируйте текст в pine editor tradingview
+//автор trade2good.com 
+//https://github.com/Lasttrader/trade2good_com
+
+//@version=5
+indicator("Weekly Statistics Table", overlay=false, max_labels_count=500)
+
+// Настройки выбора типа анализа
+analyze_mode = input.string(title="Analysis Mode",defval="Both",options=["Both", "Bearish", "Bullish"], tooltip="Select which type of candles to analyze:\n- Both: Analyze all candles\n- Bearish: Only analyze bearish candles\n- Bullish: Only analyze bullish candles")
+
+// Создаем массивы для каждого дня недели
+var float[] min_ranges = array.new_float(7, na)  // Минимальные диапазоны
+var float[] max_ranges = array.new_float(7, na)  // Максимальные диапазоны
+var float[] total_open_close_diff = array.new_float(7, na)  // Сумма разниц открытия/закрытия
+var float[] total_high_low_diff = array.new_float(7, na)  // Сумма разниц high/low
+var float[] max_open_close_diff = array.new_float(7, na)  // Максимальная разница Open-Close
+var float[] max_high_low_diff = array.new_float(7, na)  // Максимальная разница High-Low
+var float[] min_open_close_diff = array.new_float(7, na)  // Минимальная разница Open-Close
+var float[] min_high_low_diff = array.new_float(7, na)  // Минимальная разница High-Low
+var int[] counts = array.new_int(7, 0)  // Количество свечей
+
+// Текущий диапазон свечи
+current_range = high - low
+open_close_diff = math.abs(close - open)
+high_low_diff = math.abs(high - low)
+
+// Проверка соответствия выбранному режиму анализа
+is_candle_valid = ((analyze_mode == "Both") or (analyze_mode == "Bearish" and close < open) or    (analyze_mode == "Bullish" and close > open))
+
+// Обновление статистики для текущего дня недели
+day_index = dayofweek - 1
+
+if is_candle_valid and day_index >= 0 and day_index <= 6
+    // Минимальный диапазон
+    array.set(min_ranges, day_index, na(array.get(min_ranges, day_index)) ? current_range : math.min(array.get(min_ranges, day_index), current_range))
+    // Максимальный диапазон
+    array.set(max_ranges, day_index, na(array.get(max_ranges, day_index)) ? current_range : math.max(array.get(max_ranges, day_index), current_range))
+    // Сумма разниц открытия/закрытия
+    array.set(total_open_close_diff, day_index, na(array.get(total_open_close_diff, day_index)) ? open_close_diff : array.get(total_open_close_diff, day_index) + open_close_diff)
+    // Сумма разниц high/low
+    array.set(total_high_low_diff, day_index, na(array.get(total_high_low_diff, day_index)) ? high_low_diff : array.get(total_high_low_diff, day_index) + high_low_diff)
+    // Максимальная разница Open-Close
+    array.set(max_open_close_diff, day_index, na(array.get(max_open_close_diff, day_index)) ? open_close_diff : math.max(array.get(max_open_close_diff, day_index), open_close_diff))
+    // Максимальная разница High-Low
+    array.set(max_high_low_diff, day_index, na(array.get(max_high_low_diff, day_index)) ? high_low_diff : math.max(array.get(max_high_low_diff, day_index), high_low_diff))
+    // Минимальная разница Open-Close
+    array.set(min_open_close_diff, day_index, na(array.get(min_open_close_diff, day_index)) ? open_close_diff : math.min(array.get(min_open_close_diff, day_index), open_close_diff))
+    // Минимальная разница High-Low
+    array.set(min_high_low_diff, day_index, na(array.get(min_high_low_diff, day_index)) ? high_low_diff : math.min(array.get(min_high_low_diff, day_index), high_low_diff))
+    // Подсчет количества свечей
+    array.set(counts, day_index, array.get(counts, day_index) + 1)
+
+// Рассчитываем средние значения для каждого дня недели
+average_open_close_diffs = array.new_float(7, na)
+average_high_low_diffs = array.new_float(7, na)
+
+for i = 0 to 6
+    count = array.get(counts, i)
+    avg_oc_diff = count > 0 ? array.get(total_open_close_diff, i) / count : na
+    avg_hl_diff = count > 0 ? array.get(total_high_low_diff, i) / count : na
+    array.set(average_open_close_diffs, i, avg_oc_diff)
+    array.set(average_high_low_diffs, i, avg_hl_diff)
+
+// Создаем таблицу
+var table weekly_table = table.new(position.top_center, 10, 8, border_width=1, border_color=color.gray)
+
+if barstate.islast
+    // Заголовки таблицы
+    table.cell(weekly_table, 0, 0, "Day", bgcolor=color.new(color.blue, 90), text_color=color.white)
+    table.cell(weekly_table, 0, 1, "Min Range", bgcolor=color.new(color.blue, 90), text_color=color.white)
+    table.cell(weekly_table, 0, 2, "Max Range", bgcolor=color.new(color.blue, 90), text_color=color.white)
+    table.cell(weekly_table, 0, 3, "Avg OC Diff", bgcolor=color.new(color.blue, 90), text_color=color.white)
+    table.cell(weekly_table, 0, 4, "Avg HL Diff", bgcolor=color.new(color.blue, 90), text_color=color.white)
+    table.cell(weekly_table, 0, 5, "Max OC Diff", bgcolor=color.new(color.blue, 90), text_color=color.white)
+    table.cell(weekly_table, 0, 6, "Max HL Diff", bgcolor=color.new(color.blue, 90), text_color=color.white)
+    table.cell(weekly_table, 0, 7, "Min OC Diff", bgcolor=color.new(color.blue, 90), text_color=color.white)
+    table.cell(weekly_table, 0, 8, "Min HL Diff", bgcolor=color.new(color.blue, 90), text_color=color.white)
+    table.cell(weekly_table, 0, 9, "Count", bgcolor=color.new(color.blue, 90), text_color=color.white)
+    
+    // Названия дней недели
+    day_labels = array.from("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+    
+    // Заполнение таблицы данными
+    for i = 0 to 6
+        table.cell(weekly_table, i + 1, 0, array.get(day_labels, i), bgcolor=color.new(color.green, 90), text_color=color.white)
+        table.cell(weekly_table, i + 1, 1, str.tostring(array.get(min_ranges, i), "#.##"), bgcolor=color.new(color.green, 80), text_color=color.white)
+        table.cell(weekly_table, i + 1, 2, str.tostring(array.get(max_ranges, i), "#.##"), bgcolor=color.new(color.green, 80), text_color=color.white)
+        table.cell(weekly_table, i + 1, 3, str.tostring(array.get(average_open_close_diffs, i), "#.##"), bgcolor=color.new(color.yellow, 80), text_color=color.white)
+        table.cell(weekly_table, i + 1, 4, str.tostring(array.get(average_high_low_diffs, i), "#.##"), bgcolor=color.new(color.orange, 80), text_color=color.white)
+        table.cell(weekly_table, i + 1, 5, str.tostring(array.get(max_open_close_diff, i), "#.##"), bgcolor=color.new(color.red, 80), text_color=color.white)
+        table.cell(weekly_table, i + 1, 6, str.tostring(array.get(max_high_low_diff, i), "#.##"), bgcolor=color.new(color.purple, 80), text_color=color.white)
+        table.cell(weekly_table, i + 1, 7, str.tostring(array.get(min_open_close_diff, i), "#.##"), bgcolor=color.new(color.green, 80), text_color=color.white)
+        table.cell(weekly_table, i + 1, 8, str.tostring(array.get(min_high_low_diff, i), "#.##"), bgcolor=color.new(color.green, 80), text_color=color.white)
+        table.cell(weekly_table, i + 1, 9, str.tostring(array.get(counts, i)), bgcolor=color.new(color.gray, 80), text_color=color.white)
